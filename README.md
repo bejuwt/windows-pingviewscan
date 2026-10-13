@@ -6,6 +6,16 @@ reports. Built with C# / .NET 10 and WPF.
 
 ![tabs: Ping Monitor, Network Scan]
 
+## Download
+
+Grab a prebuilt, self-contained executable from the
+[Releases](https://github.com/bejuwt/windows-pingviewscan/releases) page
+(`PingViewScan.App.exe` or the `.zip`). No .NET install required.
+
+> The binaries are **not code-signed**, so Windows SmartScreen may show
+> "Windows protected your PC". Choose **More info → Run anyway**, or
+> right-click the file → **Properties → Unblock**.
+
 ## Features
 
 **Ping Monitor**
