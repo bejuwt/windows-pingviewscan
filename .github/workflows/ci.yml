@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build
+        run: dotnet build PingViewScan.slnx -c Release
+
+      - name: Smoke-test CLI (scan + report)
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "scan.html"
+          dotnet run --project src/PingViewScan.Cli -c Release -- --scan 127.0.0.1 --ports 135,445 --report $report
+          if (-not (Test-Path $report)) { throw "Scan report was not produced" }
+          if ((Get-Item $report).Length -lt 100) { throw "Scan report looks empty" }
+          Write-Host "Report OK: $report"
