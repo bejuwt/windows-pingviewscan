@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PingViewScan.App/PingViewScan.App.csproj" />
+    <Project Path="src/PingViewScan.Cli/PingViewScan.Cli.csproj" />
+    <Project Path="src/PingViewScan.Core/PingViewScan.Core.csproj" />
+  </Folder>
+</Solution>

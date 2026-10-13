@@ -1,0 +1,72 @@
+﻿<UserControl x:Class="PingViewScan.App.Views.MonitorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <WrapPanel DockPanel.Dock="Top" Margin="8,8,8,4">
+            <TextBox Width="220" VerticalAlignment="Center"
+                     Text="{Binding NewHost, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Host name or IP address">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Return" Command="{Binding AddCommand}" />
+                </TextBox.InputBindings>
+            </TextBox>
+            <Button Content="Add" Command="{Binding AddCommand}" Margin="6,0,0,0" Padding="10,3" />
+            <Button Content="Bulk Add…" Command="{Binding BulkAddCommand}" Margin="6,0,0,0" Padding="10,3" />
+            <Button Content="Remove" Command="{Binding RemoveCommand}" Margin="6,0,0,0" Padding="10,3" />
+            <Button Content="Clear" Command="{Binding ClearCommand}" Margin="6,0,0,0" Padding="10,3" />
+
+            <TextBlock Text="Interval (s)" VerticalAlignment="Center" Margin="12,0,4,0" />
+            <TextBox Width="46" VerticalAlignment="Center"
+                     Text="{Binding IntervalSeconds, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="8,0,4,0" />
+            <TextBox Width="46" VerticalAlignment="Center"
+                     Text="{Binding TimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button Content="{Binding RunningLabel}" Command="{Binding ToggleRunningCommand}"
+                    Margin="12,0,0,0" Padding="16,3" MinWidth="72" Foreground="White">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="#16a34a" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                <Setter Property="Background" Value="#dc2626" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+
+            <Button Content="Export HTML" Command="{Binding ExportHtmlCommand}" Margin="12,0,0,0" Padding="10,3" />
+            <Button Content="Export CSV" Command="{Binding ExportCsvCommand}" Margin="6,0,0,0" Padding="10,3" />
+        </WrapPanel>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <TextBlock Text="{Binding StatusText}" />
+        </StatusBar>
+
+        <DataGrid ItemsSource="{Binding Hosts}"
+                  SelectedItem="{Binding SelectedHost}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  RowHeaderWidth="0"
+                  Margin="8,0,8,8">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Host" Binding="{Binding Address}" Width="180" />
+                <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="120" />
+                <DataGridTextColumn Header="Hostname" Binding="{Binding Hostname}" Width="200" />
+                <DataGridTextColumn Header="Sent" Binding="{Binding Stats.Sent}" Width="55" />
+                <DataGridTextColumn Header="Recv" Binding="{Binding Stats.Received}" Width="55" />
+                <DataGridTextColumn Header="Lost" Binding="{Binding Stats.Lost}" Width="55" />
+                <DataGridTextColumn Header="Loss %" Binding="{Binding Stats.LossPercent, StringFormat={}{0:0.0}}" Width="70" />
+                <DataGridTextColumn Header="Last" Binding="{Binding Stats.Last, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="70" />
+                <DataGridTextColumn Header="Min" Binding="{Binding Stats.Min, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="70" />
+                <DataGridTextColumn Header="Max" Binding="{Binding Stats.Max, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="70" />
+                <DataGridTextColumn Header="Avg" Binding="{Binding Stats.Average, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="70" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</UserControl>

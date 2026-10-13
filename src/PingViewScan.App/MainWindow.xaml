@@ -1,0 +1,15 @@
+﻿<Window x:Class="PingViewScan.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:PingViewScan.App.Views"
+        Title="PingViewScan" Height="760" Width="1180"
+        WindowStartupLocation="CenterScreen">
+    <TabControl Margin="6">
+        <TabItem Header="Ping Monitor">
+            <views:MonitorView />
+        </TabItem>
+        <TabItem Header="Network Scan">
+            <views:ScanView />
+        </TabItem>
+    </TabControl>
+</Window>
