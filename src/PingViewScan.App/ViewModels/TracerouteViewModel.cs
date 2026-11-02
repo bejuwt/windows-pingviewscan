@@ -22,12 +22,15 @@ public sealed record TraceNode(
 /// <summary>Backs the graphical traceroute tab.</summary>
 public sealed class TracerouteViewModel : ObservableObject
 {
+    // Static field initializers run in declaration order: the cache must exist
+    // before the brushes below call BrushFromHex, which reads it.
+    private static readonly Dictionary<string, Brush> BrushCache = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly Brush WhiteBrush = Brushes.White;
     private static readonly Brush MutedBrush = BrushFromHex("#94a3b8");
     private static readonly Brush BlueBrush = BrushFromHex("#2563eb");
     private static readonly Brush GreenBrush = BrushFromHex("#16a34a");
     private static readonly Brush GrayBrush = BrushFromHex("#cbd5e1");
-    private static readonly Dictionary<string, Brush> BrushCache = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly Dispatcher _dispatcher;
     private readonly Dictionary<int, HopLatencyStats> _statsStore = new();

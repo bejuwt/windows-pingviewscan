@@ -39,6 +39,24 @@ jobs:
           }
           Write-Host "WPF startup self-test OK"
 
+      # The single-file exe is a shipped asset too; make sure it actually
+      # starts after self-extracting its native libraries.
+      - name: Smoke-test single-file build (WPF startup self-test)
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "app-single"
+          dotnet publish src/PingViewScan.App/PingViewScan.App.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $out
+          $exe = Join-Path $out "PingViewScan.App.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--selftest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            $log = Join-Path $env:LOCALAPPDATA "PingViewScan\logs\startup.log"
+            if (Test-Path $log) { Get-Content $log }
+            throw "Single-file WPF startup self-test failed (exit code $($process.ExitCode))"
+          }
+          Write-Host "Single-file WPF startup self-test OK"
+
       - name: Smoke-test CLI (scan + report)
         shell: pwsh
         run: |
