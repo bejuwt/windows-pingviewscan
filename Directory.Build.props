@@ -3,8 +3,15 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>1.5.4</Version>
+    <!--
+      Do NOT enable InvariantGlobalization here. WPF data binding resolves the
+      markup language through XmlLanguage.GetSpecificCulture(); with invariant
+      globalization there is no en-US culture data and every binding that
+      attaches throws "Cannot find non-neutral culture related to 'en-us'"
+      as soon as the main window is shown.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Version>1.5.5</Version>
     <!-- Allows the Windows-targeted WPF app to be restored/built on non-Windows hosts. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>

@@ -11,6 +11,8 @@ namespace PingViewScan.App;
 /// </summary>
 public partial class App : Application
 {
+    private bool _startupFailed;
+
     public App()
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
@@ -27,8 +29,9 @@ public partial class App : Application
             $"({RuntimeInformation.FrameworkDescription}, {RuntimeInformation.ProcessArchitecture}, " +
             $"OS {Environment.OSVersion}, 64-bit process: {Environment.Is64BitProcess})");
 
-        // Used by CI to prove the XAML for every tab loads on a real Windows
-        // machine without needing an interactive desktop.
+        // Used by CI to prove the published app really shows its window on a
+        // Windows host. Showing the window matters: data bindings only resolve
+        // their markup culture once the window has a presentation source.
         if (e.Args.Any(arg => string.Equals(arg, "--selftest", StringComparison.OrdinalIgnoreCase)))
         {
             RunSelfTest();
@@ -45,6 +48,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            _startupFailed = true;
             StartupLog.Write("Fatal error while starting the main window", ex);
             ShowFatalError(
                 "PingViewScan could not start.",
@@ -56,16 +60,39 @@ public partial class App : Application
 
     private void RunSelfTest()
     {
+        DispatcherTimer? timeout = null;
         try
         {
             var window = new MainWindow();
-            window.Measure(new Size(1180, 760));
-            window.Arrange(new Rect(0, 0, 1180, 760));
-            StartupLog.Write("Self-test OK: MainWindow and all tab views loaded.");
-            Shutdown(0);
+
+            // ContentRendered only fires after the visual tree has been shown
+            // and rendered, which is exactly when the en-US binding culture was
+            // being resolved in the field.
+            timeout = new DispatcherTimer(DispatcherPriority.ApplicationIdle, Dispatcher)
+            {
+                Interval = TimeSpan.FromSeconds(15)
+            };
+            timeout.Tick += (_, _) =>
+            {
+                timeout!.Stop();
+                StartupLog.Write("Self-test failed: window did not render within 15 seconds.");
+                Shutdown(3);
+            };
+            timeout.Start();
+
+            window.ContentRendered += (_, _) =>
+            {
+                timeout!.Stop();
+                StartupLog.Write("Self-test OK: MainWindow rendered and all tab views loaded.");
+                window.Close();
+                Shutdown(0);
+            };
+
+            window.Show();
         }
         catch (Exception ex)
         {
+            timeout?.Stop();
             StartupLog.Write("Self-test failed", ex);
             Shutdown(2);
         }
@@ -74,7 +101,14 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         StartupLog.Write("Unhandled UI exception", e.Exception);
-        ShowFatalError("PingViewScan hit an unexpected error.", e.Exception, StartupLog.Path);
+
+        // During startup the fatal-error dialog has already been shown; don't
+        // stack another one for every binding the shutdown winds down.
+        if (!_startupFailed)
+        {
+            ShowFatalError("PingViewScan hit an unexpected error.", e.Exception, StartupLog.Path);
+        }
+
         e.Handled = true;
     }
 
