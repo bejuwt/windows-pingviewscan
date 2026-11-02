@@ -35,6 +35,9 @@ jobs:
           "tag=$tag" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
           "version=$version" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
 
+      # Single-file build: most convenient, but it self-extracts its native
+      # libraries to %TEMP% at first launch, which some locked-down machines
+      # and antivirus products block. The folder build below always works.
       - name: Publish win-x64 (self-contained, single file)
         shell: pwsh
         run: |
@@ -44,6 +47,17 @@ jobs:
             --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Version=${{ steps.ver.outputs.version }} `
+            -o publish/win-x64-singlefile
+
+      - name: Publish win-x64 (self-contained, folder)
+        shell: pwsh
+        run: |
+          dotnet publish src/PingViewScan.App/PingViewScan.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
             -p:Version=${{ steps.ver.outputs.version }} `
             -o publish/win-x64
 
@@ -61,5 +75,5 @@ jobs:
           name: PingViewScan ${{ steps.ver.outputs.tag }}
           generate_release_notes: true
           files: |
-            publish/win-x64/PingViewScan.App.exe
+            publish/win-x64-singlefile/PingViewScan.App.exe
             PingViewScan-${{ steps.ver.outputs.version }}-win-x64.zip

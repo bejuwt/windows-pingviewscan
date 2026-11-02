@@ -9,13 +9,29 @@ C# / .NET 10 and WPF.
 
 ## Download
 
-Grab a prebuilt, self-contained executable from the
-[Releases](https://github.com/bejuwt/windows-pingviewscan/releases) page
-(`PingViewScan.App.exe` or the `.zip`). No .NET install required.
+Grab a prebuilt, self-contained build from the
+[Releases](https://github.com/bejuwt/windows-pingviewscan/releases) page.
+No .NET install required. There are two forms:
+
+- **`PingViewScan-<version>-win-x64.zip`** — recommended. Extract the whole
+  folder and run `PingViewScan.App.exe` from inside it.
+- **`PingViewScan.App.exe`** — a single-file convenience build. On first launch
+  it unpacks its native libraries into `%TEMP%`; if the folder build works but
+  this one does not, use the zip.
 
 > The binaries are **not code-signed**, so Windows SmartScreen may show
 > "Windows protected your PC". Choose **More info → Run anyway**, or
 > right-click the file → **Properties → Unblock**.
+
+### If it does not start
+
+1. Try the **zip build** above; single-file self-extraction is blocked by some
+   antivirus and locked-down `%TEMP%` policies.
+2. Check `%LOCALAPPDATA%\PingViewScan\logs\startup.log`. Startup and crash
+   details, including the exception and stack trace, are written there.
+3. Also look in **Event Viewer → Windows Logs → Application** for a
+   `.NET Runtime` or `Application Error` entry.
+4. Make sure you are on 64-bit Windows 10 or 11. The build targets `win-x64`.
 
 ## Features
 
