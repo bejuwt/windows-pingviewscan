@@ -18,12 +18,18 @@ public sealed class MonitorViewModel : ObservableObject
     private double _timeoutSeconds = 1;
     private string _statusText = "Idle";
     private Host? _selectedHost;
+    private ChartMode _chartMode = ChartMode.Latency;
+    private ChartTimeframe _selectedTimeframe = ChartTimeframe.All;
+    private HostFilterMode _hostFilter = HostFilterMode.All;
+    private int _chartVersion;
+    private IReadOnlyCollection<Guid> _selectedChartHostIds = Array.Empty<Guid>();
 
     public MonitorViewModel()
     {
         AddCommand = new RelayCommand(_ => AddFromInput(), _ => !string.IsNullOrWhiteSpace(NewHost));
         BulkAddCommand = new RelayCommand(_ => BulkAdd());
-        RemoveCommand = new RelayCommand(_ => RemoveSelected(), _ => SelectedHost is not null);
+        RemoveCommand = new RelayCommand(_ => RemoveSelected(),
+            _ => SelectedChartHostIds.Count > 0 || SelectedHost is not null);
         ClearCommand = new RelayCommand(_ => ClearAll(), _ => Hosts.Count > 0);
         ToggleRunningCommand = new RelayCommand(_ => ToggleRunning());
         ExportHtmlCommand = new RelayCommand(_ => ExportHtml(), _ => Hosts.Count > 0);
@@ -31,6 +37,10 @@ public sealed class MonitorViewModel : ObservableObject
     }
 
     public ObservableCollection<Host> Hosts { get; } = new();
+
+    public IReadOnlyList<ChartMode> ChartModes { get; } = new[] { ChartMode.Latency, ChartMode.Loss };
+    public IReadOnlyList<ChartTimeframe> Timeframes => ChartTimeframe.AllOptions;
+    public IReadOnlyList<HostFilterMode> HostFilters { get; } = new[] { HostFilterMode.All, HostFilterMode.Selected };
 
     public RelayCommand AddCommand { get; }
     public RelayCommand BulkAddCommand { get; }
@@ -96,6 +106,59 @@ public sealed class MonitorViewModel : ObservableObject
         }
     }
 
+    public ChartMode ChartMode
+    {
+        get => _chartMode;
+        set => Set(ref _chartMode, value);
+    }
+
+    public ChartTimeframe SelectedTimeframe
+    {
+        get => _selectedTimeframe;
+        set => Set(ref _selectedTimeframe, value);
+    }
+
+    public HostFilterMode HostFilter
+    {
+        get => _hostFilter;
+        set
+        {
+            if (Set(ref _hostFilter, value))
+            {
+                OnPropertyChanged(nameof(ShowSelectedOnly));
+            }
+        }
+    }
+
+    public bool ShowSelectedOnly => HostFilter == HostFilterMode.Selected;
+
+    /// <summary>
+    /// Bumped once per ping round (and on other history changes) so the custom
+    /// chart controls know to repaint. <see cref="ObservableCollection{T}"/> item
+    /// updates alone don't invalidate a <see cref="System.Windows.FrameworkElement"/>.
+    /// </summary>
+    public int ChartVersion
+    {
+        get => _chartVersion;
+        private set => Set(ref _chartVersion, value);
+    }
+
+    public IReadOnlyCollection<Guid> SelectedChartHostIds
+    {
+        get => _selectedChartHostIds;
+        private set => Set(ref _selectedChartHostIds, value);
+    }
+
+    /// <summary>
+    /// Called by the view whenever the table selection changes. A new list is
+    /// always assigned so the chart repaints even when the contents are equal.
+    /// </summary>
+    public void SetSelectedHosts(IEnumerable<Host> hosts)
+    {
+        SelectedChartHostIds = hosts.Select(h => h.Id).ToArray();
+        RemoveCommand.RaiseCanExecuteChanged();
+    }
+
     public void AddFromInput()
     {
         var entries = HostImport.Parse(NewHost, filterInvalid: false);
@@ -114,6 +177,7 @@ public sealed class MonitorViewModel : ObservableObject
             }
         }
         UpdateIdleStatus();
+        ChartVersion++;
         ClearCommand.RaiseCanExecuteChanged();
         ExportHtmlCommand.RaiseCanExecuteChanged();
         ExportCsvCommand.RaiseCanExecuteChanged();
@@ -130,19 +194,45 @@ public sealed class MonitorViewModel : ObservableObject
 
     private void RemoveSelected()
     {
-        if (SelectedHost is { } host)
+        HashSet<Guid> ids;
+        if (SelectedChartHostIds.Count > 0)
+        {
+            ids = new HashSet<Guid>(SelectedChartHostIds);
+        }
+        else if (SelectedHost is { } single)
+        {
+            ids = new HashSet<Guid> { single.Id };
+        }
+        else
+        {
+            return;
+        }
+
+        foreach (var host in Hosts.Where(h => ids.Contains(h.Id)).ToList())
         {
             Hosts.Remove(host);
-            UpdateIdleStatus();
-            ClearCommand.RaiseCanExecuteChanged();
         }
+
+        SelectedHost = null;
+        SetSelectedHosts(Array.Empty<Host>());
+        UpdateIdleStatus();
+        ChartVersion++;
+        ClearCommand.RaiseCanExecuteChanged();
+        ExportHtmlCommand.RaiseCanExecuteChanged();
+        ExportCsvCommand.RaiseCanExecuteChanged();
     }
 
     private void ClearAll()
     {
         Hosts.Clear();
+        SelectedHost = null;
+        SetSelectedHosts(Array.Empty<Host>());
+        _started = null;
         UpdateIdleStatus();
+        ChartVersion++;
         ClearCommand.RaiseCanExecuteChanged();
+        ExportHtmlCommand.RaiseCanExecuteChanged();
+        ExportCsvCommand.RaiseCanExecuteChanged();
     }
 
     private async void ToggleRunning()
@@ -196,9 +286,16 @@ public sealed class MonitorViewModel : ObservableObject
 
         var probes = targets.Select(async host =>
         {
-            host.Ip ??= await NetUtil.ResolveIpAsync(host.Address, ct);
-            if (host.Ip is { } ip && host.Hostname is null)
+            var resolvedNow = false;
+            if (host.Ip is null)
             {
+                host.Ip = await NetUtil.ResolveIpAsync(host.Address, ct);
+                resolvedNow = host.Ip is not null;
+            }
+            if (resolvedNow && host.Ip is { } ip && host.Hostname is null)
+            {
+                // Only look up the PTR record when the address is first resolved,
+                // so hosts without one don't trigger a DNS query every round.
                 host.Hostname = await NetUtil.ReverseDnsAsync(ip, ct);
             }
             var result = await PingRunner.PingAsync(host.Address, timeout, ct);
@@ -212,6 +309,8 @@ public sealed class MonitorViewModel : ObservableObject
             host.Stats.Add(result.RttMs);
             host.Samples.Add(new PingSample(host.Samples.Count + 1, now, result.RttMs));
         }
+
+        ChartVersion++;
 
         var sent = Hosts.Sum(h => h.Stats.Sent);
         var lost = Hosts.Sum(h => h.Stats.Lost);

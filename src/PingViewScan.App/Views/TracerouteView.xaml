@@ -1,0 +1,138 @@
+<UserControl x:Class="PingViewScan.App.Views.TracerouteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PingViewScan.App.Controls">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <DockPanel>
+        <WrapPanel DockPanel.Dock="Top" Margin="8,8,8,4">
+            <TextBlock Text="Target" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <TextBox Width="220" VerticalAlignment="Center"
+                     Text="{Binding Target, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Host name or IP address, e.g. 1.1.1.1">
+                <TextBox.InputBindings>
+                    <KeyBinding Key="Return" Command="{Binding ToggleCommand}" />
+                </TextBox.InputBindings>
+            </TextBox>
+
+            <TextBlock Text="Max hops" VerticalAlignment="Center" Margin="10,0,4,0" />
+            <ComboBox Width="62" VerticalAlignment="Center"
+                      ItemsSource="{Binding MaxHopsOptions}"
+                      SelectedItem="{Binding MaxHops}" />
+
+            <TextBlock Text="Probes" VerticalAlignment="Center" Margin="8,0,4,0" />
+            <ComboBox Width="56" VerticalAlignment="Center"
+                      ItemsSource="{Binding QueryOptions}"
+                      SelectedItem="{Binding Queries}" />
+
+            <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="8,0,4,0" />
+            <ComboBox Width="60" VerticalAlignment="Center"
+                      ItemsSource="{Binding TimeoutOptions}"
+                      SelectedItem="{Binding Timeout}" />
+
+            <CheckBox Content="Continuous" VerticalAlignment="Center" Margin="10,0,0,0"
+                      IsChecked="{Binding Continuous}" />
+
+            <TextBlock Text="Every (s)" VerticalAlignment="Center" Margin="8,0,4,0"
+                       Visibility="{Binding ShowInterval, Converter={StaticResource BoolToVis}}" />
+            <ComboBox Width="62" VerticalAlignment="Center"
+                      ItemsSource="{Binding IntervalOptions}"
+                      SelectedItem="{Binding Interval}"
+                      Visibility="{Binding ShowInterval, Converter={StaticResource BoolToVis}}" />
+
+            <Button Content="{Binding ToggleLabel}" Command="{Binding ToggleCommand}"
+                    Margin="10,0,0,0" Padding="16,3" MinWidth="72" Foreground="White">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="#2563eb" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                <Setter Property="Background" Value="#dc2626" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+
+            <Button Content="Export HTML" Command="{Binding ExportHtmlCommand}" Margin="10,0,0,0" Padding="10,3" />
+            <Button Content="Export CSV" Command="{Binding ExportCsvCommand}" Margin="6,0,0,0" Padding="10,3" />
+            <Button Content="Clear" Command="{Binding ClearCommand}" Margin="6,0,0,0" Padding="10,3" />
+        </WrapPanel>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <TextBlock Text="{Binding Message}" />
+        </StatusBar>
+
+        <Grid Margin="8,0,8,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="190" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" BorderBrush="#e5e7eb" BorderThickness="1" CornerRadius="8"
+                    Background="#fbfdff" Padding="10" Margin="0,0,0,8">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Nodes}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Rectangle Width="34" Height="4" VerticalAlignment="Center"
+                                               Fill="{Binding Connector}"
+                                               Visibility="{Binding ShowConnector, Converter={StaticResource BoolToVis}}" />
+                                    <Border Width="128" MinHeight="64" CornerRadius="8" Padding="8,6"
+                                            Background="{Binding Fill}" Margin="0,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="11"
+                                                       Foreground="{Binding TextColor}" />
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{Binding TextColor}" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="10" Opacity="0.9"
+                                                       Foreground="{Binding TextColor}" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Row="1" BorderBrush="#e5e7eb" BorderThickness="1" CornerRadius="8"
+                    Background="White" Padding="8" Margin="0,0,0,8">
+                <controls:LatencyBars Stats="{Binding Stats}" Version="{Binding ChartVersion}" />
+            </Border>
+
+            <DataGrid Grid.Row="2"
+                      ItemsSource="{Binding Hops}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      RowHeaderWidth="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="#" Binding="{Binding Ttl}" Width="40" />
+                    <DataGridTextColumn Header="Host" Binding="{Binding DisplayHost}" Width="210" />
+                    <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="120" />
+                    <DataGridTextColumn Header="Sent" Binding="{Binding Sent}" Width="55" />
+                    <DataGridTextColumn Header="Recv" Binding="{Binding Received}" Width="55" />
+                    <DataGridTextColumn Header="Lost" Binding="{Binding Timeouts}" Width="55" />
+                    <DataGridTextColumn Header="Loss %" Binding="{Binding LossText}" Width="70" />
+                    <DataGridTextColumn Header="Last" Binding="{Binding LastRtt, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="68" />
+                    <DataGridTextColumn Header="Min" Binding="{Binding MinRtt, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="68" />
+                    <DataGridTextColumn Header="Avg" Binding="{Binding AvgRtt, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="68" />
+                    <DataGridTextColumn Header="Max" Binding="{Binding MaxRtt, StringFormat={}{0:0.0}, TargetNullValue=—}" Width="68" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </DockPanel>
+</UserControl>

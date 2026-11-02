@@ -15,6 +15,26 @@ if (cmd.Has("hosts"))
     return;
 }
 
+if (cmd.Has("trace"))
+{
+    try
+    {
+        await RunTraceAsync(cmd);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Traceroute failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
+
+if (cmd.Has("subnet"))
+{
+    RunSubnet(cmd);
+    return;
+}
+
 Console.Error.WriteLine("""
 PingViewScan CLI
 
@@ -26,6 +46,14 @@ PingViewScan CLI
     PingViewScan.Cli --scan 10.0.0.0/24 [--ports 22,80,443,8000-8010]
                      [--ping-timeout 1] [--port-timeout 1] [--concurrency 64]
                      [--report out.html] [--csv out.csv]
+
+  Traceroute:
+    PingViewScan.Cli --trace 1.1.1.1 [--max-hops 30] [--queries 3]
+                     [--trace-timeout 2] [--rounds 1] [--interval 5]
+                     [--report out.html] [--csv out.csv]
+
+  Subnet:
+    PingViewScan.Cli --subnet 192.168.1.10/24 [--prefix 24]
 """);
 Environment.ExitCode = 1;
 return;
@@ -118,6 +146,129 @@ static async Task RunScanAsync(CommandLine cmd)
 
     WriteOutputs(cmd, null, report);
 }
+
+static async Task RunTraceAsync(CommandLine cmd)
+{
+    var target = (cmd.Get("trace") ?? "").Trim();
+    if (target.Length == 0 || target.StartsWith('-'))
+    {
+        Console.Error.WriteLine("A valid target host or IP is required.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var maxHops = Math.Max(1, cmd.GetInt("max-hops", 30));
+    var queries = Math.Max(1, cmd.GetInt("queries", 3));
+    var timeout = cmd.GetDouble("trace-timeout", 2);
+    var rounds = Math.Max(1, cmd.GetInt("rounds", 1));
+    var interval = cmd.GetDouble("interval", 5);
+
+    Console.WriteLine($"Tracing route to {target} (max {maxHops} hops, {queries} probes/hop, timeout {timeout:g}s)");
+
+    var started = DateTimeOffset.Now;
+    var stats = new Dictionary<int, HopLatencyStats>();
+    IReadOnlyList<TracerouteHop> lastHops = Array.Empty<TracerouteHop>();
+    string? resolved = null;
+
+    for (var round = 1; round <= rounds; round++)
+    {
+        if (rounds > 1)
+        {
+            Console.WriteLine($"Pass {round}/{rounds}");
+        }
+
+        var outcome = await TracerouteRunner.TraceAsync(
+            target,
+            queries,
+            maxHops,
+            timeout,
+            ip =>
+            {
+                if (ip is not null)
+                {
+                    resolved = ip;
+                }
+            },
+            hop =>
+            {
+                var rtt = hop.MinRtt is { } min ? $"{min,7:0.0} ms" : "       *";
+                Console.WriteLine($"  {hop.Ttl,2}  {Pad(hop.DisplayHost, 34)} {Pad(hop.Ip ?? "-", 16)} {rtt}");
+                if (!stats.TryGetValue(hop.Ttl, out var aggregate))
+                {
+                    aggregate = new HopLatencyStats(hop.Ttl);
+                    stats[hop.Ttl] = aggregate;
+                }
+                aggregate.Merge(hop);
+            });
+
+        lastHops = outcome.Hops;
+        resolved ??= outcome.ResolvedIP;
+
+        if (lastHops.Count == 0 && !string.IsNullOrWhiteSpace(outcome.Output))
+        {
+            Console.Error.WriteLine(outcome.Output.Trim());
+        }
+
+        if (round < rounds)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(Math.Max(0, interval)));
+        }
+    }
+
+    var finished = DateTimeOffset.Now;
+    var report = new TracerouteReport(
+        target,
+        resolved,
+        DateTimeOffset.Now,
+        started,
+        finished,
+        maxHops,
+        queries,
+        timeout,
+        lastHops,
+        stats.Values.OrderBy(s => s.Ttl).ToList(),
+        rounds);
+
+    Console.WriteLine();
+    Console.WriteLine($"{"Hop",3} {"Host",-34} {"IP",-16} {"Sent",5} {"Recv",5} {"Lost",5} {"Loss%",7} {"Min",8} {"Avg",8} {"Max",8}");
+    foreach (var stat in report.StatsOrHops)
+    {
+        Console.WriteLine($"{stat.Ttl,3} {Pad(stat.DisplayHost, 34)} {Pad(stat.Ip ?? "-", 16)} {stat.Sent,5} {stat.Received,5} {stat.Timeouts,5} {stat.LossPercent,7:0.0} {Num(stat.MinRtt),8} {Num(stat.AvgRtt),8} {Num(stat.MaxRtt),8}");
+    }
+    Console.WriteLine(report.ReachedTarget
+        ? $"Target {resolved} reached in {lastHops.Count} hop(s)."
+        : $"Target not reached within {maxHops} hops.");
+
+    if (cmd.Get("report") is { Length: > 0 } reportPath)
+    {
+        File.WriteAllText(reportPath, TracerouteReportExporter.Html(report));
+        Console.WriteLine($"Wrote HTML report: {Path.GetFullPath(reportPath)}");
+    }
+
+    if (cmd.Get("csv") is { Length: > 0 } csvPath)
+    {
+        File.WriteAllText(csvPath, TracerouteReportExporter.Csv(report));
+        Console.WriteLine($"Wrote CSV: {Path.GetFullPath(csvPath)}");
+    }
+}
+
+static void RunSubnet(CommandLine cmd)
+{
+    var input = cmd.Get("subnet") ?? "";
+    var (address, prefix) = SubnetCalculator.ParseInput(input, cmd.GetInt("prefix", 24));
+    var info = SubnetCalculator.Compute(address, prefix);
+    if (info is null)
+    {
+        Console.Error.WriteLine($"Invalid IPv4 address: {address}");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    Console.WriteLine(info.Summary);
+}
+
+static string Pad(string value, int width) =>
+    value.Length >= width ? value[..width] : value.PadRight(width);
 
 static void WriteOutputs(CommandLine cmd, SessionReport? monitor, ScanReport? scan)
 {

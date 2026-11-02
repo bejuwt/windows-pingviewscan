@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>1.5.3</Version>
     <!-- Allows the Windows-targeted WPF app to be restored/built on non-Windows hosts. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>

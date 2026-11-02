@@ -11,5 +11,11 @@
         <TabItem Header="Network Scan">
             <views:ScanView />
         </TabItem>
+        <TabItem Header="Subnet Calculator">
+            <views:SubnetView />
+        </TabItem>
+        <TabItem Header="Traceroute">
+            <views:TracerouteView />
+        </TabItem>
     </TabControl>
 </Window>

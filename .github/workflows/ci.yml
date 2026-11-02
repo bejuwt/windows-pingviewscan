@@ -29,3 +29,14 @@ jobs:
           if (-not (Test-Path $report)) { throw "Scan report was not produced" }
           if ((Get-Item $report).Length -lt 100) { throw "Scan report looks empty" }
           Write-Host "Report OK: $report"
+
+      - name: Smoke-test CLI (traceroute + subnet)
+        shell: pwsh
+        run: |
+          $trace = Join-Path $env:RUNNER_TEMP "trace.html"
+          dotnet run --project src/PingViewScan.Cli -c Release -- --trace 127.0.0.1 --max-hops 3 --queries 1 --trace-timeout 1 --report $trace
+          if (-not (Test-Path $trace)) { throw "Trace report was not produced" }
+          if ((Get-Item $trace).Length -lt 100) { throw "Trace report looks empty" }
+          $subnet = dotnet run --project src/PingViewScan.Cli -c Release -- --subnet 192.168.1.10/24
+          if (-not ($subnet -match "192\.168\.1\.0/24")) { throw "Unexpected subnet output: $subnet" }
+          Write-Host "Trace report OK: $trace"
