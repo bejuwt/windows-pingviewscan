@@ -27,6 +27,14 @@ public partial class App : Application
             $"({RuntimeInformation.FrameworkDescription}, {RuntimeInformation.ProcessArchitecture}, " +
             $"OS {Environment.OSVersion}, 64-bit process: {Environment.Is64BitProcess})");
 
+        // Used by CI to prove the XAML for every tab loads on a real Windows
+        // machine without needing an interactive desktop.
+        if (e.Args.Any(arg => string.Equals(arg, "--selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            RunSelfTest();
+            return;
+        }
+
         try
         {
             StartupLog.Write("Creating MainWindow…");
@@ -43,6 +51,23 @@ public partial class App : Application
                 ex,
                 StartupLog.Path);
             Shutdown(1);
+        }
+    }
+
+    private void RunSelfTest()
+    {
+        try
+        {
+            var window = new MainWindow();
+            window.Measure(new Size(1180, 760));
+            window.Arrange(new Rect(0, 0, 1180, 760));
+            StartupLog.Write("Self-test OK: MainWindow and all tab views loaded.");
+            Shutdown(0);
+        }
+        catch (Exception ex)
+        {
+            StartupLog.Write("Self-test failed", ex);
+            Shutdown(2);
         }
     }
 
